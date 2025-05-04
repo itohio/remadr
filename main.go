@@ -8,9 +8,12 @@ import (
 	"time"
 
 	"github.com/itohio/remadr/config"
+	"github.com/itohio/remadr/dev"
 	ui "github.com/itohio/tinygui"
+	"github.com/itohio/tinygui/widget"
 	"tinygo.org/x/drivers/encoders"
 	"tinygo.org/x/drivers/ssd1306"
+	"tinygo.org/x/tinyfont/proggy"
 )
 
 //go:generate tinygo flash -target=pico
@@ -27,16 +30,17 @@ var (
 )
 
 func main() {
+	dev.CalibrateWait(time.Microsecond*2000, 50)
 	machine.InitADC()
-	voltage.Configure(machine.ADCConfig{})
-
 	encoder = encoders.NewQuadratureViaInterrupt(config.ButtonA, config.ButtonB)
 	encoder.Configure(encoders.QuadratureConfig{Precision: 1})
-
-	config.SenseA.Configure(machine.PinConfig{Mode: machine.PinInputPullup})
-	config.SenseB.Configure(machine.PinConfig{Mode: machine.PinInputPullup})
-
 	config.Button.Configure(machine.PinConfig{Mode: machine.PinInputPullup})
+
+	println(fmt.Sprintf("Calibration %v / %v", dev.WaitCalibrationK, dev.WaitCalibrationM))
+
+	configureVoltage()
+	configureDriver(1)
+	configureChrono()
 
 	machine.I2C0.Configure(machine.I2CConfig{Frequency: 400 * machine.KHz})
 	// the delay is needed for display start from a cold reboot, not sure why
@@ -47,27 +51,23 @@ func main() {
 	display.ClearDisplay()
 
 	var dashboard *ui.ContainerBase[ui.Widget]
-	pulseWidth.Store(int64(defaultPulseWidth))
 
 	dashboard = ui.NewContainer[ui.Widget](
 		uint16(WIDTH), 0, ui.LayoutVList(1),
-		NewLabel(uint16(WIDTH), 20, func() string {
-			pw := time.Duration(pulseWidth.Load())
-			return fmt.Sprintf("%01v %v", pw, config.SenseA.Get())
-		}, white),
-		// NewLabel(uint16(WIDTH), 20, func() string {
-		// 	return fmt.Sprintf("%v %v %v", encoderValue, lastEncoderValue, encoderDelta)
-		// }, white),
-		NewLabel(uint16(WIDTH), 20, func() string {
-			pw := time.Duration(pulseWidth.Load())
-			energy := avgVoltage * avgVoltage * float32(pw.Seconds()) / resistance
-			return fmt.Sprintf("%0.01f J", energy)
-		}, white),
-		NewLabel(uint16(WIDTH), 20, func() string {
-			v := voltageDivider * 3.2 * float32(voltage.Get()) / 0xFFFF
-			avgVoltage = .7*avgVoltage + 0.3*v
-			return fmt.Sprintf("%0.02f V", avgVoltage)
-		}, white),
+		widget.NewLabelArray(uint16(WIDTH), 9, &proggy.TinySZ8pt7b, white,
+			func() string {
+				return fmt.Sprintf("%v %v", config.SenseA.Get(), config.SenseB.Get())
+			},
+			func() string {
+				return fmt.Sprintf("%v %v", config.ChronoA.Get(), config.ChronoB.Get())
+			},
+			func() string {
+				return fmt.Sprintf("%0.2f", voltages[0])
+			},
+			func() string {
+				return fmt.Sprintf("%0.2f", voltages[1])
+			},
+		)...,
 	)
 	dW, dH := dashboard.Size()
 	ctx := ui.NewRandomContext(&display, time.Second*1, dW, dH)
@@ -89,9 +89,9 @@ func main() {
 			lastReset = time.Now()
 		}
 		display.ClearBuffer()
-		config.TEST.High()
 		dashboard.Draw(&ctx)
 		display.Display()
-		config.TEST.Low()
+
+		meter.ReadVoltages(voltages[:])
 	}
 }

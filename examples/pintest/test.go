@@ -9,8 +9,10 @@ import (
 
 	"github.com/itohio/remadr/config"
 	ui "github.com/itohio/tinygui"
+	"github.com/itohio/tinygui/widget"
 	"tinygo.org/x/drivers/encoders"
 	"tinygo.org/x/drivers/ssd1306"
+	"tinygo.org/x/tinyfont/proggy"
 )
 
 //go:generate tinygo flash -target=pico
@@ -56,22 +58,23 @@ func main() {
 
 	dashboard = ui.NewContainer[ui.Widget](
 		uint16(WIDTH), 0, ui.LayoutVList(1),
-		NewLabel(uint16(WIDTH), 9, func() string {
-			return fmt.Sprintf("%v %v", config.SenseA.Get(), config.SenseB.Get())
-		}, white),
-		NewLabel(uint16(WIDTH), 9, func() string {
-			return fmt.Sprintf("%v %v", config.ChronoA.Get(), config.ChronoB.Get())
-		}, white),
-		NewLabel(uint16(WIDTH), 9, func() string {
-			return fmt.Sprintf("%0.2f", 3.3*float64(config.VoltageA.Get())/float64(0x7FFF))
-		}, white),
-		NewLabel(uint16(WIDTH), 9, func() string {
-			return fmt.Sprintf("%0.2f", 3.3*float64(config.VoltageB.Get())/float64(0x7FFF))
-		}, white),
-		NewLabel(uint16(WIDTH), 9, func() string {
-			pw := time.Duration(pulseWidth.Load())
-			return fmt.Sprintf("%01v", pw)
-		}, white),
+		widget.NewLabelArray(uint16(WIDTH), 9, &proggy.TinySZ8pt7b, white,
+			func() string {
+				return fmt.Sprintf("%v %v", config.SenseA.Get(), config.SenseB.Get())
+			},
+			func() string {
+				return fmt.Sprintf("%v %v", config.ChronoA.Get(), config.ChronoB.Get())
+			},
+			func() string {
+				return fmt.Sprintf("%0.2f", 3.3*float64(config.VoltageA.Get())/float64(0x7FFF))
+			},
+			func() string {
+				return fmt.Sprintf("%0.2f", 3.3*float64(config.VoltageB.Get())/float64(0x7FFF))
+			},
+			func() string {
+				pw := time.Duration(pulseWidth.Load())
+				return fmt.Sprintf("%01v", pw)
+			})...,
 	)
 	dW, dH := dashboard.Size()
 	ctx := ui.NewRandomContext(&display, time.Second*10, dW, dH)

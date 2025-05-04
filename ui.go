@@ -1,11 +1,8 @@
 package main
 
 import (
-	"image/color"
 	"machine"
 	"time"
-
-	"tinygo.org/x/drivers"
 
 	"github.com/itohio/remadr/config"
 	ui "github.com/itohio/tinygui"
@@ -16,31 +13,6 @@ var (
 	encoderValue     int
 	encoderDelta     int
 )
-
-func hLine(d drivers.Displayer, x, y, w int16, c color.RGBA) {
-	for w > 0 {
-		d.SetPixel(x, y, c)
-		x++
-		w--
-	}
-}
-func vLine(d drivers.Displayer, x, y, h int16, c color.RGBA) {
-	for h > 0 {
-		d.SetPixel(x, y, c)
-		y++
-		h--
-	}
-}
-
-func button(p machine.Pin) time.Duration {
-	now := time.Now()
-	time.Sleep(time.Millisecond * 10)
-	for !p.Get() {
-		time.Sleep(time.Millisecond)
-		machine.Watchdog.Update()
-	}
-	return time.Since(now)
-}
 
 func runButtons() chan ui.UserCommand {
 	command := make(chan ui.UserCommand)
@@ -71,7 +43,7 @@ func runButtons() chan ui.UserCommand {
 			case encoderDelta < 0:
 				cmd(ui.DOWN)
 			case !config.Button.Get():
-				d := button(config.Button)
+				d := ui.PeekButton(config.Button)
 				if d > time.Second {
 					if d > time.Second*5 {
 						cmd(ui.RESET)
@@ -103,16 +75,15 @@ func runUI(cmd chan ui.UserCommand, w *ui.ContainerBase[ui.Widget]) {
 
 			switch c {
 			case ui.UP:
-				pulseIncrease(1)
 			case ui.DOWN:
-				pulseDecrease(1)
 			case ui.LONG_UP:
-				pulseIncrease(10)
 			case ui.LONG_DOWN:
-				pulseDecrease(10)
 			case ui.RESET:
-				machine.CPUReset()
 			case ui.ENTER:
+				meter.ReadVoltages(voltagesPreShot[:])
+				chrono.Reset()
+				driver.Reset()
+				driver.Arm()
 			case ui.ESC:
 			case ui.IDLE:
 			}
