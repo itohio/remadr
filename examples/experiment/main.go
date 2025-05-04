@@ -39,8 +39,9 @@ func main() {
 	println(fmt.Sprintf("Calibration %v / %v", dev.WaitCalibrationK, dev.WaitCalibrationM))
 
 	configureVoltage()
-	configureDriver(1)
 	configureChrono()
+	configureDriver(1)
+	configureSerial()
 
 	machine.I2C0.Configure(machine.I2CConfig{Frequency: 400 * machine.KHz})
 	// the delay is needed for display start from a cold reboot, not sure why

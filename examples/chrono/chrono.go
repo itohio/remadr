@@ -9,9 +9,10 @@ import (
 
 	"github.com/itohio/remadr/config"
 	"github.com/itohio/remadr/dev"
-	mdui "github.com/itohio/remadr/ui"
 	ui "github.com/itohio/tinygui"
+	"github.com/itohio/tinygui/widget"
 	"tinygo.org/x/drivers/ssd1306"
+	"tinygo.org/x/tinyfont/freemono"
 )
 
 //go:generate tinygo flash -target=pico
@@ -62,16 +63,16 @@ func main() {
 
 	dashboard = ui.NewContainer[ui.Widget](
 		uint16(WIDTH), 0, ui.LayoutVList(1),
-		mdui.NewLabel(uint16(WIDTH), 12, func() string {
+		widget.NewLabel(uint16(WIDTH), 12, &freemono.Regular9pt7b, func() string {
 			return fmt.Sprintf("%v %v", count, chrono.IsValid())
 		}, white),
-		mdui.NewLabel(uint16(WIDTH), 11, func() string {
+		widget.NewLabel(uint16(WIDTH), 11, &freemono.Regular9pt7b, func() string {
 			return fmt.Sprintf("%0.3f m/s", speed)
 		}, white),
-		mdui.NewLabel(uint16(WIDTH), 11, func() string {
+		widget.NewLabel(uint16(WIDTH), 11, &freemono.Regular9pt7b, func() string {
 			return fmt.Sprintf("%0.5f", lenA)
 		}, white),
-		mdui.NewLabel(uint16(WIDTH), 11, func() string {
+		widget.NewLabel(uint16(WIDTH), 11, &freemono.Regular9pt7b, func() string {
 			return fmt.Sprintf("%0.5f", lenB)
 		}, white),
 	)
