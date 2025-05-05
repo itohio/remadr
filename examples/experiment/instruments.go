@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"machine"
 	"strconv"
 	"strings"
@@ -85,7 +86,7 @@ func configureDriver(numStages int) {
 		)
 	}
 	if numStages >= 2 {
-		stages[0] = dev.NewSimpleStage(config.TriggerB, config.SenseB,
+		stages[1] = dev.NewSimpleStage(config.TriggerB, config.SenseB,
 			time.Microsecond*2000,
 			time.Microsecond*1000,
 		)
@@ -99,8 +100,20 @@ func configureDriver(numStages int) {
 			chErr <- err
 		},
 		func(u []time.Duration) {
+			stage1, _ := driver.GetStage(0)
+			dt1 := stage1.(dev.DwellTimer)
+			if numStages == 1 {
+				driveCh <- drive{
+					dA: dt1.DwellTime(),
+				}
+				return
+			}
+			stage2, _ := driver.GetStage(1)
+			dt2 := stage2.(dev.DwellTimer)
 			driveCh <- drive{
 				interStage: u[1] - u[0],
+				dA:         dt1.DwellTime(),
+				dB:         dt2.DwellTime(),
 			}
 		},
 		stages...,
@@ -123,7 +136,7 @@ type cmdCfg struct {
 	param string
 }
 
-func configureMux(uart *machine.UART) chan cmdCfg {
+func configureMux(uart io.Reader) chan cmdCfg {
 	cmd := make(chan cmdCfg, 3)
 	submit := func(c whatCmd, data []byte) {
 		select {
@@ -132,9 +145,9 @@ func configureMux(uart *machine.UART) chan cmdCfg {
 		}
 	}
 
-	ui.NewCommandStreamMux(uart, map[string]func([]byte){
+	mux := ui.NewCommandStreamMux(uart, map[string]func([]byte){
 		"?":     func(b []byte) { submit(READ_VOLTAGE, b) },
-		"banks": func(b []byte) { submit(READ_VOLTAGE, b) },
+		"state": func(b []byte) { submit(READ_VOLTAGE, b) },
 		"s":     func(b []byte) { submit(SET_STAGE, b) },
 		"d":     func(b []byte) { submit(DRIVE, b) },
 		"drive": func(b []byte) { submit(DRIVE, b) },
@@ -142,11 +155,15 @@ func configureMux(uart *machine.UART) chan cmdCfg {
 		"test":  func(b []byte) { submit(TEST, b) },
 	})
 
+	go mux.Run()
+
 	return cmd
 }
 
 func configureSerial() {
-	cmdCh := configureMux(machine.DefaultUART)
+	uart := machine.Serial
+	uart.Configure(machine.UARTConfig{TX: machine.UART0_TX_PIN, RX: machine.UART0_RX_PIN})
+	cmdCh := configureMux(ui.NewSerialReader(uart))
 
 	go func() {
 		shotCount := 0
@@ -161,7 +178,7 @@ func configureSerial() {
 				println(fmt.Sprintf("SHOT %d %f %v %v", shotCount, shot.speed, shot.dA, shot.dB))
 				shotCount++
 			case drive := <-driveCh:
-				println(fmt.Sprintf("DRIVE %d %v between triggers", driveCount, drive.interStage))
+				println(fmt.Sprintf("DRIVE %d %v %v %v", driveCount, drive.dA, drive.dB, drive.interStage))
 				driveCount++
 			}
 		}
@@ -172,7 +189,7 @@ func handleCmd(c cmdCfg) {
 	switch c.what {
 	case READ_VOLTAGE:
 		meter.ReadVoltages(voltagesPreShot[:])
-		println(fmt.Sprintf("BANKS %f %f", voltagesPreShot[0], voltagesPreShot[1]))
+		println(fmt.Sprintf("STATE %d %f %f %v %v %v %v", STAGES, voltagesPreShot[0], voltagesPreShot[1], config.SenseA, config.SenseB, config.ChronoA, config.ChronoB))
 	case SET_STAGE:
 		params := strings.Split(c.param, ",")
 		if len(params) < 2 {

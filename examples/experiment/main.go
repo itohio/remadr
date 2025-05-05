@@ -16,8 +16,6 @@ import (
 	"tinygo.org/x/tinyfont/proggy"
 )
 
-//go:generate tinygo flash -target=pico
-
 var (
 	WIDTH  int16 = 120
 	HEIGHT int16 = 8
@@ -30,19 +28,7 @@ var (
 )
 
 func main() {
-	dev.CalibrateWait(time.Microsecond*2000, 50)
 	machine.InitADC()
-	encoder = encoders.NewQuadratureViaInterrupt(config.ButtonA, config.ButtonB)
-	encoder.Configure(encoders.QuadratureConfig{Precision: 1})
-	config.Button.Configure(machine.PinConfig{Mode: machine.PinInputPullup})
-
-	println(fmt.Sprintf("Calibration %v / %v", dev.WaitCalibrationK, dev.WaitCalibrationM))
-
-	configureVoltage()
-	configureChrono()
-	configureDriver(1)
-	configureSerial()
-
 	machine.I2C0.Configure(machine.I2CConfig{Frequency: 400 * machine.KHz})
 	// the delay is needed for display start from a cold reboot, not sure why
 	time.Sleep(time.Second)
@@ -51,11 +37,45 @@ func main() {
 	display.Configure(cfg)
 	display.ClearDisplay()
 
+	log := widget.NewLog(uint16(WIDTH), 9, 5, &proggy.TinySZ8pt7b, white)
+	logCtx := ui.NewContext(&display, log.Width, log.Height, 0, 0)
+
+	display.ClearDisplay()
+	log.Log(&logCtx, "Calibrating...")
+	dev.CalibrateWait(time.Microsecond*2000, 50)
+
+	display.ClearDisplay()
+	log.Log(&logCtx, "encoder")
+	encoder = encoders.NewQuadratureViaInterrupt(config.ButtonA, config.ButtonB)
+	encoder.Configure(encoders.QuadratureConfig{Precision: 1})
+	config.Button.Configure(machine.PinConfig{Mode: machine.PinInputPullup})
+
+	println(fmt.Sprintf("Calibration %v / %v", dev.WaitCalibrationK, dev.WaitCalibrationM))
+
+	display.ClearDisplay()
+	log.Log(&logCtx, "meter")
+	configureVoltage()
+	display.ClearDisplay()
+	log.Log(&logCtx, "chrono")
+	configureChrono()
+	display.ClearDisplay()
+	log.Log(&logCtx, "driver")
+	configureDriver(STAGES)
+	display.ClearDisplay()
+	log.Log(&logCtx, "serial")
+	configureSerial()
+	display.ClearDisplay()
+	log.Log(&logCtx, "Done")
+	time.Sleep(time.Second)
+
 	var dashboard *ui.ContainerBase[ui.Widget]
 
 	dashboard = ui.NewContainer[ui.Widget](
 		uint16(WIDTH), 0, ui.LayoutVList(1),
 		widget.NewLabelArray(uint16(WIDTH), 9, &proggy.TinySZ8pt7b, white,
+			func() string {
+				return TITLE
+			},
 			func() string {
 				return fmt.Sprintf("%v %v", config.SenseA.Get(), config.SenseB.Get())
 			},
@@ -79,6 +99,8 @@ func main() {
 	machine.Watchdog.Start()
 
 	go runUI(runButtons(), dashboard)
+
+	machine.LED.High()
 
 	// Drawing and moving display around
 	ticker := time.NewTicker(time.Millisecond * 50)
