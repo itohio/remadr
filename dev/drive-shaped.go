@@ -62,6 +62,7 @@ func (s *ShapedPulseStage) Configure(mode machine.PinMode, pc machine.PinChange,
 
 //go:noinline
 func (s *ShapedPulseStage) handleInterrupt(pin machine.Pin) {
+	now := ticks()
 	state := s.getState()
 	if state != Armed && state != Active && state != Done {
 		return
@@ -70,10 +71,10 @@ func (s *ShapedPulseStage) handleInterrupt(pin machine.Pin) {
 		return
 	}
 	if pin.Get() == s.val {
-		volatile.StoreUint64(&s.senseStart, ticks())
+		volatile.StoreUint64(&s.senseStart, now)
 		s.t <- struct{}{}
 	} else {
-		volatile.StoreUint64(&s.senseEnd, ticks())
+		volatile.StoreUint64(&s.senseEnd, now)
 		s.abortPulse()
 	}
 }
@@ -106,7 +107,9 @@ func (s *ShapedPulseStage) handlePulse(onComplete func(time.Duration)) {
 		}
 		s.setState(Active)
 
+		println("run")
 		s.triggerStart = s.shape.Run(s.trigger)
+		println("unr")
 		s.triggerEnd = Now()
 		if onComplete != nil {
 			onComplete(time.Duration(ticksToNanoseconds(volatile.LoadUint64(&s.senseStart))))

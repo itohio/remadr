@@ -40,7 +40,7 @@ func (pt PulseTrain) Run(p machine.Pin) (triggerStart time.Duration) {
 
 func (pt PulseTrain) Abort(p machine.Pin) {
 	p.Low()
-	atomic.StoreUint32(&pt.r, 1)
+	atomic.StoreUint32(&pt.r, 0)
 }
 
 func (pt PulseTrain) Durations() []time.Duration {

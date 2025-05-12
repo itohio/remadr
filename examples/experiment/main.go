@@ -94,7 +94,7 @@ func main() {
 	ctx := ui.NewRandomContext(&display, time.Second*1, dW, dH)
 
 	machine.Watchdog.Configure(machine.WatchdogConfig{
-		TimeoutMillis: 3000,
+		TimeoutMillis: 10000000,
 	})
 	machine.Watchdog.Start()
 

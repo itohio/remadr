@@ -189,7 +189,7 @@ func handleCmd(c cmdCfg) {
 	switch c.what {
 	case READ_VOLTAGE:
 		meter.ReadVoltages(voltagesPreShot[:])
-		println(fmt.Sprintf("STATE %d %f %f %v %v %v %v", STAGES, voltagesPreShot[0], voltagesPreShot[1], config.SenseA, config.SenseB, config.ChronoA, config.ChronoB))
+		println(fmt.Sprintf("STATE %d %f %f %v %v %v %v", STAGES, voltagesPreShot[0], voltagesPreShot[1], config.SenseA.Get(), config.SenseB.Get(), config.ChronoA.Get(), config.ChronoB.Get()))
 	case SET_STAGE:
 		params := strings.Split(c.param, ",")
 		if len(params) < 2 {
@@ -215,12 +215,22 @@ func handleCmd(c cmdCfg) {
 			println("STAGE ! " + err.Error())
 			return
 		}
-		err = s.(*dev.ShapedPulseStage).SetShape(shape)
+		err = s.(dev.Shaper).SetShape(shape)
 		if err != nil {
 			println("STAGE ! " + err.Error())
 			return
 		}
+		var bs strings.Builder
+		bs.WriteString("STAGE ")
+		bs.WriteString(strconv.FormatInt(int64(id), 10))
+		for _, d := range shape {
+			bs.WriteString(" ")
+			bs.WriteString(d.String())
+		}
+		println(bs.String())
+		bs.Reset()
 	case DRIVE:
+		machine.Watchdog.Update()
 		meter.ReadVoltages(voltagesPreShot[:])
 		chrono.Reset()
 		driver.Reset()

@@ -53,11 +53,11 @@ func runButtons() chan ui.UserCommand {
 					cmd(ui.ENTER)
 				}
 			}
-			time.Sleep(time.Millisecond * 10)
+			time.Sleep(time.Millisecond)
 			if N == 0 {
 				cmd(ui.IDLE)
 			}
-			N = (N + 1) % 100
+			N = (N + 1) % 10
 		}
 	}()
 
